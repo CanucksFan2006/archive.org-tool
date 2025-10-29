@@ -1,0 +1,10 @@
+# Ignore build and binary folders
+/bin/
+/obj/
+
+# Ignore user-specific files (e.g., Visual Studio)
+*.user
+
+# Ignore temporary files (e.g., Windows thumbs.db, macOS .DS_Store)
+Thumbs.db
+.DS_Store

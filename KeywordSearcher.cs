@@ -520,6 +520,7 @@ namespace Archive.org_Tools
                         }
                         location += $"\\{item}";
                     }
+                    location += "\\";
                     listBox2.Items.Clear();
                     HttpResponseMessage result;
                     try
@@ -553,8 +554,8 @@ namespace Archive.org_Tools
                         resumeFile = System.IO.File.Open(location + "\\CDXLinksResume.txt", FileMode.Append, FileAccess.Write);
                         if (inUse == 0 && resumeFile != null)
                         {
-                            resumeFile.Write(Encoding.UTF8.GetBytes(textBox2.Text + "\n"));
-                            remainingPages.Add(textBox2.Text);
+                            resumeFile.Write(Encoding.UTF8.GetBytes(URL + "\n"));
+                            remainingPages.Add(URL);
                             if (mtype != "")
                             {
                                 resumeFile.Write(Encoding.UTF8.GetBytes("m" + "\n"));
@@ -648,6 +649,7 @@ namespace Archive.org_Tools
                     }
                     location += $"\\{item}";
                 }
+                location += "\\";
                 listBox2.Items.Clear();
                 HttpResponseMessage result;
                 try
@@ -681,8 +683,8 @@ namespace Archive.org_Tools
                     resumeFile = System.IO.File.Open(location + "\\CDXLinksResume.txt", FileMode.Append, FileAccess.Write);
                     if (inUse == 0 && resumeFile != null)
                     {
-                        resumeFile.Write(Encoding.UTF8.GetBytes(textBox2.Text + "\n"));
-                        remainingPages.Add(textBox2.Text);
+                        resumeFile.Write(Encoding.UTF8.GetBytes(URL + "\n"));
+                        remainingPages.Add(URL);
                         if (mtype != "")
                         {
                             resumeFile.Write(Encoding.UTF8.GetBytes("m" + "\n"));
@@ -1175,15 +1177,15 @@ namespace Archive.org_Tools
                         await Task.Delay(100);
                     }
                     await Task.WhenAll(tasks);
-                    if (resumeFile != null)
-                    {
-                        resumeFile.Close();
-                        resumeFile = null;
-                    }
                     pagesFinished = 0;
                     label14.Text = $"Items In Queue: {PagesToWrite.Count.ToString()}";
                     if (exitFlag != 1)
                     {
+                        if (resumeFile != null)
+                        {
+                            resumeFile.Close();
+                            resumeFile = null;
+                        }
                         if (maxSizeFlag != 1)
                         {
                             MessageBox.Show("Done");
@@ -1240,6 +1242,19 @@ namespace Archive.org_Tools
                         }
                     }
                 }
+                if (CDXList.Count == 0)
+                {
+                    if (file != null)
+                    {
+                        file.Close();
+                        file = null;
+                    }
+                    if (resumeFile != null)
+                    {
+                        resumeFile.Close();
+                        resumeFile = null;
+                    }
+                }
                 string[] list = location.Split(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) + "\\KeywordScraper");
                 string locationToCheck = location + "\\";
                 string[] list1 = list[1].Split("\\");
@@ -1265,14 +1280,6 @@ namespace Archive.org_Tools
                     locationToCheck = locationToCheck.Substring(0, locationToCheck.Length - loc.Length - 1);
                 }
                 listBox5.Items.Remove(listBox5.Items[listBox5.Items.IndexOf(list[1].Substring(1).Replace("\\", "/"))]);
-                if (CDXList.Count == 0)
-                {
-                    if (file != null)
-                    {
-                        file.Close();
-                        file = null;
-                    }
-                }
                 try
                 {
                     var lines = System.IO.File.ReadLines(location + $"\\CDXLinks1.txt").Where(line => int.TryParse(line.ToString().Substring(0, 1), out int result)).ToList();
@@ -1341,7 +1348,7 @@ namespace Archive.org_Tools
                     {
                         listBox2.Items.Add($"Page {pageNum}: Error");
                     });
-                    await Task.Delay(1000 * 30);
+                    await Task.Delay(1000 * 45);
                     continue;
                 }
                 if (response.IsSuccessStatusCode)
@@ -1377,10 +1384,10 @@ namespace Archive.org_Tools
                     {
                         listBox2.Items.Add($"Page {pageNum}: Error {(int)response.StatusCode}");
                     });
-                    await Task.Delay(1000 * 30);
+                    await Task.Delay(1000 * 45);
                     continue;
                 }
-                await Task.Delay(1000 * 3);
+                await Task.Delay(1000 * 4);
             }
         }
         private async void GetAllArchivedPagesThreadMaker(object sender, EventArgs e)
@@ -1579,6 +1586,7 @@ namespace Archive.org_Tools
                 });
                 if (result.Substring(result.Length - 11, 11) == "/robots.txt")
                 {
+                    semaphoreSlim.Release();
                     continue;
                 }
                 string timestamp = result.Substring(0, 14);
@@ -1624,14 +1632,17 @@ namespace Archive.org_Tools
                         listBox3.Items.Add($"Rate Limit");
                         label7.Text = $"Pages Remaining: {lineCount}";
                     });
-                    await Task.Delay(1000 * 30);
+                    if (exitFlag != 1)
+                    {
+                        await Task.Delay(1000 * 120);
+                    }
                     continue;
                 }
                 if (response.IsSuccessStatusCode)
                 {
                     string respText;
                     if (response.Content.Headers.ContentEncoding.Contains("gzip"))
-                    {
+                    {   
                         using (var gzip = new GZipStream(await response.Content.ReadAsStreamAsync(), CompressionMode.Decompress))
                         {
                             using (var reader = new StreamReader(gzip, Encoding.UTF8))
@@ -1653,8 +1664,9 @@ namespace Archive.org_Tools
                         {
                             respText = await response.Content.ReadAsStringAsync();
                         }
-                        catch
+                        catch (Exception ex)
                         {
+                            MessageBox.Show(ex.ToString());
                             continue;
                         }
                     }
@@ -1779,10 +1791,6 @@ namespace Archive.org_Tools
             {
                 pageFile.Close();
                 var n = URLList.Count.ToString();
-                if (lineCount.ToString() != n)
-                {
-                    MessageBox.Show(n, lineCount.ToString());
-                }
                 this.BeginInvoke((MethodInvoker)delegate
                 {
                     label7.Text = $"Pages Remaining: {n}";

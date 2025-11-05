@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace Archive.org_Tools
 {
     internal static class Program
@@ -11,6 +13,9 @@ namespace Archive.org_Tools
             // To customize application configuration such as set high DPI settings or default font,
             // see https://aka.ms/applicationconfiguration.
             ApplicationConfiguration.Initialize();
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new Menu());
         }
     }

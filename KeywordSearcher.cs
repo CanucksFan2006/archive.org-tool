@@ -537,7 +537,7 @@ namespace Archive.org_Tools
                         {
                             mtype = "&matchType=domain";
                         }
-                        result = await pagesClient.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&filter=statuscode:200&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page=0&showNumPages=true");
+                        result = await pagesClient.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&filter=statuscode:200|302&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page=0&showNumPages=true");
                     }
                     catch
                     {
@@ -666,7 +666,7 @@ namespace Archive.org_Tools
                     {
                         mtype = "&matchType=domain";
                     }
-                    result = await pagesClient.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&filter=statuscode:200&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page=0&showNumPages=true");
+                    result = await pagesClient.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&filter=statuscode:200|302&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page=0&showNumPages=true");
                 }
                 catch
                 {
@@ -773,7 +773,7 @@ namespace Archive.org_Tools
                     }
                     try
                     {
-                        result = await client.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&fl=timestamp,original&filter=statuscode:200&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page={int.Parse(textBox3.Text) - 1}");
+                        result = await client.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&fl=timestamp,original&filter=statuscode:200|302&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page={int.Parse(textBox3.Text) - 1}");
                     }
                     catch
                     {
@@ -966,7 +966,7 @@ namespace Archive.org_Tools
                 }
                 try
                 {
-                    result = await client.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&fl=timestamp,original&filter=statuscode:200&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page={int.Parse(textBox3.Text) - 1}");
+                    result = await client.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&fl=timestamp,original&filter=statuscode:200|302&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page={int.Parse(textBox3.Text) - 1}");
                 }
                 catch
                 {
@@ -1339,7 +1339,7 @@ namespace Archive.org_Tools
                 }
                 try
                 {
-                    response = await client.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&fl=timestamp,original&filter=statuscode:200&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page={pageNum}");
+                    response = await client.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&fl=timestamp,original&filter=statuscode:200|302&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page={pageNum}");
                 }
                 catch
                 {
@@ -1599,21 +1599,29 @@ namespace Archive.org_Tools
                 {
                     try
                     {
-                        semaphoreSlim.Release();
+                        await Task.Delay(500);
+                        response = await client.GetAsync($"https://web.archive.org/web/{timestamp}/{URL}");
                     }
                     catch
                     {
-                        //
+                        try
+                        {
+                            semaphoreSlim.Release();
+                        }
+                        catch
+                        {
+                            //
+                        }
+                        URLList.Enqueue(result);
+                        lineCount++;
+                        this.Invoke((MethodInvoker)delegate
+                        {
+                            listBox3.Items.Add($"Error");
+                            label7.Text = $"Pages Remaining: {lineCount}";
+                        });
+                        await Task.Delay(5000);
+                        continue;
                     }
-                    URLList.Enqueue(result);
-                    lineCount++;
-                    this.Invoke((MethodInvoker)delegate
-                    {
-                        listBox3.Items.Add($"Error");
-                        label7.Text = $"Pages Remaining: {lineCount}";
-                    });
-                    await Task.Delay(5000);
-                    continue;
                 }
                 catch
                 {
@@ -1634,7 +1642,7 @@ namespace Archive.org_Tools
                     });
                     if (exitFlag != 1)
                     {
-                        await Task.Delay(1000 * 120);
+                        await Task.Delay(1000 * 45);
                     }
                     continue;
                 }
@@ -1653,7 +1661,75 @@ namespace Archive.org_Tools
                                 }
                                 catch
                                 {
-                                    continue;
+                                    try
+                                    {
+                                        response = await client.GetAsync($"https://web.archive.org/web/{timestamp}/{URL}");
+                                    }
+                                    catch
+                                    {
+                                        try
+                                        {
+                                            semaphoreSlim.Release();
+                                        }
+                                        catch
+                                        {
+                                            //
+                                        }
+                                        URLList.Enqueue(result);
+                                        lineCount++;
+                                        this.Invoke((MethodInvoker)delegate
+                                        {
+                                            listBox3.Items.Add($"Error");
+                                            label7.Text = $"Pages Remaining: {lineCount}";
+                                        });
+                                        await Task.Delay(5000);
+                                        continue;
+                                    }
+                                    if (response.Content.Headers.ContentEncoding.Contains("gzip"))
+                                    {
+                                        using (var gzip1 = new GZipStream(await response.Content.ReadAsStreamAsync(), CompressionMode.Decompress))
+                                        {
+                                            using (var reader1 = new StreamReader(gzip1, Encoding.UTF8))
+                                            {
+                                                try
+                                                {
+                                                    respText = await reader1.ReadToEndAsync();
+                                                }
+                                                catch
+                                                {
+                                                    try
+                                                    {
+                                                        semaphoreSlim.Release();
+                                                    }
+                                                    catch
+                                                    {
+                                                        //
+                                                    }
+                                                    URLList.Enqueue(result);
+                                                    lineCount++;
+                                                    this.Invoke((MethodInvoker)delegate
+                                                    {
+                                                        listBox3.Items.Add($"Error");
+                                                        label7.Text = $"Pages Remaining: {lineCount}";
+                                                    });
+                                                    await Task.Delay(5000);
+                                                    continue;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        try
+                                        {
+                                            respText = await response.Content.ReadAsStringAsync();
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            MessageBox.Show(ex.ToString());
+                                            continue;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1704,12 +1780,13 @@ namespace Archive.org_Tools
                         await Task.Delay(1000 * 30);
                         URLList.Enqueue(result);
                         lineCount++;
+                        continue;
                     }
                     else
                     {
                         try
                         {
-                            await Task.Delay(1000);
+                            semaphoreSlim.Release();
                         }
                         catch
                         {

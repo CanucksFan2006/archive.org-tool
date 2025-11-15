@@ -1754,7 +1754,7 @@ namespace Archive.org_Tools
                             {
                                 listBox4.Items.Add($"Match Found: {k}");
                                 totalMatches++;
-                                label17.Text = $"Total Matches {totalMatches}";
+                                label17.Text = $"Total Matches: {totalMatches}";
 
                             });
                             ChangesList.Enqueue($"{result} {k}");

@@ -9,7 +9,7 @@ namespace Archive.org_Tools
     {
         private ThumbnailGrabber thumbnailGrabber = null;
         private KeywordSearcher keywordSearcher = null;
-        string version = "1.1";
+        string version = "1.2";
         HttpClient client = new HttpClient();
         Random random = new Random();
         public Menu()

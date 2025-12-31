@@ -55,7 +55,9 @@ namespace Archive.org_Tools
         List<Task> tasks = new List<Task>();
         Stopwatch stopwatch = new Stopwatch();
         SemaphoreSlim semaphoreSlim = new SemaphoreSlim(10,10);
+        SemaphoreSlim semaphoreSlimCDX = new SemaphoreSlim(10, 10);
         int pagesFinished = 0;
+        int CDXFinished = 0;
         string location = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) + "\\KeywordScraper";
         int itemNumber = -1;
         char[] invalidCharacters = Path.GetInvalidFileNameChars();
@@ -126,7 +128,6 @@ namespace Archive.org_Tools
                     try
                     {
                         int.Parse(line.Trim());
-                        CDXList.Enqueue(line.Trim());
                     }
                     catch
                     {
@@ -353,10 +354,6 @@ namespace Archive.org_Tools
                 {
                     break;
                 }
-                if (CDXList.Count == 0)
-                {
-                    break;
-                }
                 await Task.Delay(100);
             }
         }
@@ -405,6 +402,77 @@ namespace Archive.org_Tools
                 }
             }
             pagesFinished = 1;
+        }
+        private async Task insertCDX()
+        {
+            using (FileStream myfile = new FileStream((location + $"\\CDXLinksResume.txt"), FileMode.Open, FileAccess.Read))
+            using (StreamReader reader = new StreamReader(myfile))
+            {
+                string? line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    try
+                    {
+                        await semaphoreSlimCDX.WaitAsync();
+                        await Task.Delay(100);
+                        if (exitFlag == 1)
+                        {
+                            try
+                            {
+                                int.Parse(line.Trim());
+                                CDXList.Enqueue(line.Trim());
+                            }
+                            catch
+                            {
+                                semaphoreSlimCDX.Release();
+                            }
+                            break;
+                        }
+                        if (maxSizeFlag == 1)
+                        {
+                            break;
+                        }
+                        try
+                        {
+                            int.Parse(line.Trim());
+                            CDXList.Enqueue(line.Trim());
+                        }
+                        catch
+                        {
+                            semaphoreSlimCDX.Release();
+                        }
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+                }
+                if (exitFlag == 1)
+                {
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        try
+                        {
+                            try
+                            {
+                                int.Parse(line.Trim());
+                                CDXList.Enqueue(line.Trim());
+                            }
+                            catch
+                            {
+                                semaphoreSlimCDX.Release();
+                            }
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+
+                    }
+                    return;
+                }
+            }
+            CDXFinished = 1;
         }
         private void KeywordShown(object sender, EventArgs e)
         {
@@ -537,7 +605,7 @@ namespace Archive.org_Tools
                         {
                             mtype = "&matchType=domain";
                         }
-                        result = await pagesClient.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&filter=statuscode:200|302&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page=0&showNumPages=true");
+                        result = await pagesClient.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&filter=statuscode:200&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page=0&showNumPages=true");
                     }
                     catch
                     {
@@ -573,7 +641,6 @@ namespace Archive.org_Tools
                             }
                             for (int i = 0; i < int.Parse(pages); i++)
                             {
-                                CDXList.Enqueue(i.ToString());
                                 remainingPages.Add(i.ToString());
                                 resumeFile.Write(Encoding.UTF8.GetBytes(i.ToString() + "\n"));
                             }
@@ -666,7 +733,7 @@ namespace Archive.org_Tools
                     {
                         mtype = "&matchType=domain";
                     }
-                    result = await pagesClient.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&filter=statuscode:200|302&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page=0&showNumPages=true");
+                    result = await pagesClient.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&filter=statuscode:200&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page=0&showNumPages=true");
                 }
                 catch
                 {
@@ -702,7 +769,6 @@ namespace Archive.org_Tools
                         }
                         for (int i = 0; i < int.Parse(pages); i++)
                         {
-                            CDXList.Enqueue(i.ToString());
                             remainingPages.Add(i.ToString());
                             resumeFile.Write(Encoding.UTF8.GetBytes(i.ToString() + "\n"));
                         }
@@ -773,7 +839,7 @@ namespace Archive.org_Tools
                     }
                     try
                     {
-                        result = await client.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&fl=timestamp,original&filter=statuscode:200|302&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page={int.Parse(textBox3.Text) - 1}");
+                        result = await client.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&fl=timestamp,original&filter=statuscode:200&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page={int.Parse(textBox3.Text) - 1}");
                     }
                     catch
                     {
@@ -966,7 +1032,7 @@ namespace Archive.org_Tools
                 }
                 try
                 {
-                    result = await client.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&fl=timestamp,original&filter=statuscode:200|302&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page={int.Parse(textBox3.Text) - 1}");
+                    result = await client.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&fl=timestamp,original&filter=statuscode:200&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page={int.Parse(textBox3.Text) - 1}");
                 }
                 catch
                 {
@@ -1165,17 +1231,17 @@ namespace Archive.org_Tools
                 }
                 MessageBox.Show("Creating Threads");
                 label14.Visible = true;
-                while (CDXList.Count != 0 && exitFlag != 1)
+                while (exitFlag != 1)
                 {
                     label14.Text = $"Items In Queue: {PagesToWrite.Count.ToString()}";
                     tasks.Add(Task.Run(() => sizeCheck()));
-                    resumeFile = System.IO.File.Open(location + "\\CDXLinksResume.txt", FileMode.Append, FileAccess.Write);
                     for (int x = 0; x < 10; x++)
                     {
                         int tIndex = x;
                         tasks.Add(Task.Run(async () => await GetAllPages(URL, tIndex, mtype, from, to)));
                         await Task.Delay(100);
                     }
+                    tasks.Add(Task.Run(async () => await insertCDX()));
                     await Task.WhenAll(tasks);
                     pagesFinished = 0;
                     label14.Text = $"Items In Queue: {PagesToWrite.Count.ToString()}";
@@ -1192,7 +1258,8 @@ namespace Archive.org_Tools
                         }
                         var resumeFilePath = "";
                         List<string> filtered;
-                        if (CDXList.Count != 0)
+                        filtered = remainingPages.Where(s => s != null && int.TryParse(s, out int result)).ToList();
+                        if (filtered.Count != 0)
                         {
                             resumeFilePath = Path.Combine(location, "CDXLinksResume.txt");
                             filtered = remainingPages.Where(s => s != null).ToList();
@@ -1255,31 +1322,31 @@ namespace Archive.org_Tools
                         resumeFile = null;
                     }
                 }
-                string[] list = location.Split(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) + "\\KeywordScraper");
-                string locationToCheck = location + "\\";
-                string[] list1 = list[1].Split("\\");
-                Array.Reverse(list1);
-                foreach (string loc in list1)
-                {
-                    if (loc == Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) + "\\KeywordScraper" || loc == "")
-                    {
-                        continue;
-                    }
-                    if (System.IO.Directory.GetFiles(locationToCheck, "CDXLinks*.txt").Length == 0 && System.IO.Directory.GetDirectories(locationToCheck).Length == 0)
-                    {
-                        System.IO.Directory.Delete(locationToCheck);
-                    }
-                    else
-                    {
-                        if (locationToCheck == location + "\\" && !System.IO.File.Exists(location + "\\CDXLinksResume.txt"))
-                        {
-                            listBox6.Items.Add(listBox5.Items[listBox5.Items.IndexOf(list[1].Substring(1).Replace("\\", "/"))]);
-                        }
-                        break;
-                    }
-                    locationToCheck = locationToCheck.Substring(0, locationToCheck.Length - loc.Length - 1);
-                }
-                listBox5.Items.Remove(listBox5.Items[listBox5.Items.IndexOf(list[1].Substring(1).Replace("\\", "/"))]);
+                //string[] list = location.Split(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) + "\\KeywordScraper");
+                //string locationToCheck = location + "\\";
+                //string[] list1 = list[1].Split("\\");
+                //Array.Reverse(list1);
+                //foreach (string loc in list1)
+                //{
+                //    if (loc == Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) + "\\KeywordScraper" || loc == "")
+                //    {
+                //        continue;
+                //    }
+                //    if (System.IO.Directory.GetFiles(locationToCheck, "CDXLinks*.txt").Length == 0 && System.IO.Directory.GetDirectories(locationToCheck).Length == 0)
+                //    {
+                //        System.IO.Directory.Delete(locationToCheck);
+                //    }
+                //    else
+                //    {
+                //        if (locationToCheck == location + "\\" && !System.IO.File.Exists(location + "\\CDXLinksResume.txt"))
+                //        {
+                //            listBox6.Items.Add(listBox5.Items[listBox5.Items.IndexOf(list[1].Substring(1).Replace("\\", "/"))]);
+                //        }
+                //        break;
+                //    }
+                //    locationToCheck = locationToCheck.Substring(0, locationToCheck.Length - loc.Length - 1);
+                //}
+                //listBox5.Items.Remove(listBox5.Items[listBox5.Items.IndexOf(list[1].Substring(1).Replace("\\", "/"))]);
                 try
                 {
                     var lines = System.IO.File.ReadLines(location + $"\\CDXLinks1.txt").Where(line => int.TryParse(line.ToString().Substring(0, 1), out int result)).ToList();
@@ -1317,21 +1384,38 @@ namespace Archive.org_Tools
         }
         private async Task GetAllPages(string URL, int id, string mtype, string from, string to)
         {
-            while (CDXList.Count != 0)
+            while (true)
             {
                 HttpResponseMessage response;
                 bool restart = false;
                 if (exitFlag == 1)
                 {
+                    try
+                    {
+                        semaphoreSlimCDX.Release();
+                    }
+                    catch
+                    {
+                        //
+                    }
                     break;
                 }
                 if (maxSizeFlag == 1)
                 {
+                    try
+                    {
+                        semaphoreSlimCDX.Release();
+                    }
+                    catch
+                    {
+                        //
+                    }
                     break;
                 }
-                if (!CDXList.TryDequeue(out string? pageNum))
+                CDXList.TryDequeue(out string? pageNum);
+                if (pageNum == null)
                 {
-                    break;
+                    continue;
                 }
                 if (!remainingPages.Contains(pageNum.Trim()))
                 {
@@ -1339,7 +1423,7 @@ namespace Archive.org_Tools
                 }
                 try
                 {
-                    response = await client.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&fl=timestamp,original&filter=statuscode:200|302&filter=!mimetype:warc/revisit&from={from}&to={to}{mtype}&pageSize=10&page={pageNum}");
+                    response = await client.GetAsync($"https://web.archive.org/cdx/search/cdx?url={URL}*&fl=timestamp,original&filter=statuscode:200&filter=!mimetype:warc/revisit{mtype}&pageSize=10&page={pageNum}");
                 }
                 catch
                 {
@@ -1349,6 +1433,14 @@ namespace Archive.org_Tools
                         listBox2.Items.Add($"Page {pageNum}: Error");
                     });
                     await Task.Delay(1000 * 45);
+                    try
+                    {
+                        semaphoreSlimCDX.Release();
+                    }
+                    catch
+                    {
+                        //
+                    }
                     continue;
                 }
                 if (response.IsSuccessStatusCode)
@@ -1366,9 +1458,12 @@ namespace Archive.org_Tools
                         {
                             if (line.Length != 0)
                             {
-                                totalPages++;
-                                PagesToWrite.Enqueue(line.Trim());
-                                URLList.Enqueue(line.Trim());
+                                if (int.Parse(line.Substring(0,from.Length)) >= int.Parse(from) && int.Parse(line.Substring(0, to.Length)) <= int.Parse(to))
+                                {
+                                    totalPages++;
+                                    PagesToWrite.Enqueue(line.Trim());
+                                    URLList.Enqueue(line.Trim());
+                                }
                             }
                         }
                     }
@@ -1385,9 +1480,25 @@ namespace Archive.org_Tools
                         listBox2.Items.Add($"Page {pageNum}: Error {(int)response.StatusCode}");
                     });
                     await Task.Delay(1000 * 45);
+                    try
+                    {
+                        semaphoreSlimCDX.Release();
+                    }
+                    catch
+                    {
+                        //
+                    }
                     continue;
                 }
                 await Task.Delay(1000 * 4);
+                try
+                {
+                    semaphoreSlimCDX.Release();
+                }
+                catch
+                {
+                    //
+                }
             }
         }
         private async void GetAllArchivedPagesThreadMaker(object sender, EventArgs e)
@@ -1586,7 +1697,14 @@ namespace Archive.org_Tools
                 });
                 if (result.Substring(result.Length - 11, 11) == "/robots.txt")
                 {
-                    semaphoreSlim.Release();
+                    try
+                    {
+                        semaphoreSlim.Release();
+                    }
+                    catch
+                    {
+                        //
+                    }
                     continue;
                 }
                 string timestamp = result.Substring(0, 14);
